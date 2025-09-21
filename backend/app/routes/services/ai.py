@@ -1,15 +1,22 @@
-from transformers import pipeline
+import openai, os
 
-# Load summarization and transcription models
-summarizer = pipeline("summarization")
-transcriber = pipeline("automatic-speech-recognition")
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-def transcribe_audio(audio_file_path):
-    return transcriber(audio_file_path)["text"]
+def transcribe_audio(file_path: str) -> str:
+    with open(file_path, "rb") as audio_file:
+        transcript = openai.Audio.transcriptions.create(
+            model="whisper-1", file=audio_file
+        )
+    return transcript["text"]
 
-def summarize_text(text):
-    return summarizer(text, max_length=150, min_length=30, do_sample=False)[0]["summary_text"]
+def summarize_text(text: str, speaker: str = None) -> str:
+    prompt = "Summarize the following meeting transcript."
+    if speaker:
+        prompt += f" Focus only on what {speaker} said."
+    prompt += f"\n\n{text}"
 
-def extract_action_items(text):
-    # Simple keyword-based extraction
-    return [line for line in text.split('\n') if any(kw in line.lower() for kw in ["action", "todo", "task", "deadline"])]
+    response = openai.Chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.choices[0].message.content
